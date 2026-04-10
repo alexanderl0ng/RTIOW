@@ -1,0 +1,6 @@
+.DS_Store
+
+*.ppm
+
+debug/
+release/

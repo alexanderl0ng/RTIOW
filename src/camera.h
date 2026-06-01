@@ -4,6 +4,11 @@
 #include "hittable.h"
 #include "material.h"
 
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <cstdint>
+#endif
+
 class camera {
 	public:
 		float aspect_ratio 		= 1.0;
@@ -19,24 +24,40 @@ class camera {
         float defocus_angle = 0;
         float focus_dist = 10;
 
-		void render(const hittable& world) {
+		#ifdef __EMSCRIPTEN__
+        void render(const hittable& world, uint8_t* buffer) {
 			initialize();
-
+		#else
+        void render(const hittable& world) {
+			initialize();
 			std::cout << "P3\n" << image_width << ' ' << image_height << "\n255\n";
+		#endif
 
 			for (int j = 0; j < image_height; j++) {
+                #ifndef __EMSCRIPTEN__
 				std::clog << "\rScanlines remaining: " << (image_height - j) << ' ' << std::flush;
+                #endif
 				for (int i = 0; i < image_width; i++) {
 					color pixel_color(0, 0, 0);
 					for (int sample = 0; sample < samples_per_pixel; sample++) {
 						ray r = get_ray(i, j);
 						pixel_color += ray_color(r, max_depth, world);
 					}
+                    #ifdef __EMSCRIPTEN__
+                    auto c = pixel_samples_scale * pixel_color;
+                    int idx = (j * image_width + i) * 4;
+                    buffer[idx + 0] = static_cast<uint8_t>(256 * std::clamp(c.x(), 0.0f, 0.999f));
+                    buffer[idx + 1] = static_cast<uint8_t>(256 * std::clamp(c.y(), 0.0f, 0.999f));
+                    buffer[idx + 2] = static_cast<uint8_t>(256 * std::clamp(c.z(), 0.0f, 0.999f));
+                    buffer[idx + 3] = 255;
+                    #else
 					write_color(std::cout, pixel_samples_scale * pixel_color);
+                    #endif
 				}
 			}
-
+            #ifndef __EMSCRIPTEN__
 			std::clog << "\rDone.                      \n";
+            #endif
 		}
 
 	private:

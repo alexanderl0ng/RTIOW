@@ -1,3 +1,8 @@
+#ifdef __EMSCRIPTEN__
+#include <emscripten.h>
+#include <cstdint>
+#endif
+
 #include "rtweekend.h"
 
 #include "camera.h"
@@ -6,9 +11,78 @@
 #include "material.h"
 #include "sphere.h"
 
+#ifndef __EMSCRIPTEN__
 #include <iostream>
+#endif
 
+hittable_list build_world();
+
+#ifdef __EMSCRIPTEN__
+extern "C" {
+    EMSCRIPTEN_KEEPALIVE
+    uint8_t* create_buffer(int width, int height) {
+        return new uint8_t[width * height * 4]();
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    void destroy_buffer(uint8_t* buf) {
+        delete[] buf;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    void render(
+        uint8_t* buffer,
+        float lookfrom_x, float lookfrom_y, float lookfrom_z,
+        float lookat_x, float lookat_y, float lookat_z,
+        float defocus_angle,
+        int samples_per_pixel,
+        int image_width
+    ) {
+        hittable_list world = build_world();
+
+        camera cam;
+
+        cam.aspect_ratio        = 16.0 / 9.0;
+        cam.image_width         = image_width;
+        cam.samples_per_pixel   = samples_per_pixel;
+        cam.max_depth           = 50;
+
+        cam.vfov                = 20;
+        cam.lookfrom            = point3(lookfrom_x, lookfrom_y, lookfrom_z);
+        cam.lookat              = point3(lookat_x, lookat_y, lookat_z);
+        cam.vup                 = vec3(0, 1, 0);
+
+        cam.defocus_angle       = defocus_angle;
+        cam.focus_dist          = (cam.lookfrom - cam.lookat).length();
+        cam.render(world, buffer);
+    }
+}
+#endif
+
+#ifndef __EMSCRIPTEN__
 int main() {
+    hittable_list world = build_world();
+
+	camera cam;
+
+	cam.aspect_ratio 		= 16.0 / 9.0;
+	cam.image_width 		= 1200;
+	cam.samples_per_pixel	= 500;
+    cam.max_depth           = 50;
+
+    cam.vfov     = 20;
+    cam.lookfrom = point3(13, 2, 3);
+    cam.lookat   = point3(0, 0, 0);
+    cam.vup      = vec3(0, 1, 0);
+
+    cam.defocus_angle = 0.6;
+    cam.focus_dist    = 10.0;
+
+	cam.render(world);
+}
+#endif
+
+hittable_list build_world() {
 	hittable_list world;
 
     auto ground_material = make_shared<lambertian>(color(0.5, 0.5, 0.5));
@@ -48,21 +122,6 @@ int main() {
     auto material3 = make_shared<metal>(color(0.7, 0.6, 0.5), 0.0);
     world.add(make_shared<sphere>(point3(4, 1, 0), 1.0, material3));
 
-	camera cam;
-
-	cam.aspect_ratio 		= 16.0 / 9.0;
-	cam.image_width 		= 1200;
-	cam.samples_per_pixel	= 500;
-    cam.max_depth           = 50;
-
-    cam.vfov     = 20;
-    cam.lookfrom = point3(13, 2, 3);
-    cam.lookat   = point3(0, 0, 0);
-    cam.vup      = vec3(0, 1, 0);
-
-    cam.defocus_angle = 0.6;
-    cam.focus_dist    = 10.0;
-
-	cam.render(world);
+    return world;
 }
 
